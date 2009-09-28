@@ -1,4 +1,32 @@
 == bz2redmine
 
-You should document your project here.
-yet another lin
+bz2redmine is a script to convert your existing bugzilla database to 
+a redmine database. Bugzilla is a popular Bugtracking-System. Redmine
+is a increaingly popular bugtracking system as well. Compared with Bugzilla,
+Redmine has a couple of unique features.
+
+Parts of the script (especially many of the SQL-statements) are based 
+on the bz2redmine.php-Script by Robert Heath. See the CREDITS file for
+details. 
+
+You can find Bugzilla here: http://www.bugzilla.org
+
+You can find Redmine here: http://www.redmine.org
+
+== Features
+
+* Preserves the Bugzilla Bug Numbers
+* Converts most of the existing Bugzilla-Data including attachments
+* Has been successfully used to convert a Bugzilla 3.4.1-Installation 
+  (upgraded from a Bugzilla 2.2.18) to Redmine 0.8.4 and Redmine trunk.
+
+== Usage
+
+* Backup your Databases and your existing redmine installation. 
+  The script will delete all of the data of your existing redmine installation.
+* If you are working on a new installation of redmine make shure you ran
+  "rake redmine:load_default_data"
+* Copy the settings.rb.example file to settings.rb and modify the settings
+  to match your needs.
+* run the script
+
