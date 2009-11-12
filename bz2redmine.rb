@@ -255,14 +255,14 @@ class BugzillaToRedmine
         who,
         isprivate) = row
       if(current_bug_id != bug_id)
-        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, due_date, priority_id, fixed_version_id, category_id, tracker_id, status_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         status_id = 1
         version_id = self.find_version_id(product_id, version)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = @issuePriorities[priority]
         tracker_id = @issueTrackers[bug_severity]
         status_id = @issueStatus[bug_status]
-        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, '', priority_id, version_id, component_id, tracker_id,  status_id)
+        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, version_id, component_id, tracker_id,  status_id)
         current_bug_id = bug_id
       else
         sql = "INSERT INTO journals (id, journalized_id, journalized_type, user_id, notes, created_on)  VALUES (?, ?, ?, ?, ?, ?)"
