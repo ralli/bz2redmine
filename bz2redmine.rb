@@ -320,7 +320,7 @@ class BugzillaToRedmine
       role_id = '6'
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
-      self.red_exec_sql("INSERT INTO members (user_id, project_id, role_id, created_on, mail_notification)", user_id, product_id, role_id, created_on, mail_notification)
+      self.red_exec_sql("INSERT INTO members (user_id, project_id, role_id, created_on, mail_notification) VALUES (?,?,?,?,?)", user_id, product_id, role_id, created_on, mail_notification)
     end
   end
 
