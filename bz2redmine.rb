@@ -293,7 +293,7 @@ class BugzillaToRedmine
       filesize = thedata.size()
       sql = "INSERT INTO attachments (id, container_id, container_type, filename, filesize, disk_filename, content_type, digest, downloads, author_id, created_on, description) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       self.red_exec_sql(sql, attach_id, bug_id, 'Issue', filename, filesize, disk_filename, mimetype, '', 0, submitter_id, creation_ts, description)
-      File.open("#{ATTACHMENT_PATH}/#{disk_filename}", "w") do |f|
+      File.open("#{ATTACHMENT_PATH}/#{disk_filename}", "wb") do |f|
         f.write(thedata)
       end
     end
