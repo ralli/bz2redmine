@@ -62,7 +62,7 @@ ISSUE_TRACKERS = {
   "major" => 1,
   "normal" => 1,
   "blocker" => 1,
-  "enhancment" => 1
+  "enhancement" => 1
 }
 
 #
