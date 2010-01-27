@@ -317,7 +317,7 @@ class BugzillaToRedmine
     self.bz_select_sql("SELECT DISTINCT user_group_map.user_id, group_control_map.product_id AS project_id FROM group_control_map, user_group_map WHERE group_control_map.group_id = user_group_map.group_id") do |row|
       user_id = row[0]
       product_id = row[1]
-      role_id = '6'
+      role_id = DEFAULT_ROLE_ID
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
       self.red_exec_sql("INSERT INTO members (user_id, project_id, role_id, created_on, mail_notification) VALUES (?,?,?,?,?)", user_id, product_id, role_id, created_on, mail_notification)

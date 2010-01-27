@@ -84,3 +84,18 @@ ISSUE_STATUS = {
   "CLOSED"        => 5
 }
 
+#
+# Default Role ID for Project Members
+#
+# In a default Redmine installation the following options are available:
+#
+# 1: Non member
+# 2: Anonymous
+# 3: Manager
+# 4: Developer
+# 5: Reporter
+
+DEFAULT_ROLE_ID = '3'
+
+
+
