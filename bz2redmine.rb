@@ -229,7 +229,7 @@ class BugzillaToRedmine
 		       longdescs.isprivate
 		   FROM bugs, longdescs
 		   WHERE bugs.bug_id = longdescs.bug_id
-		   ORDER BY bugs.creation_ts, longdescs.bug_when"
+		   ORDER BY bugs.bug_id, longdescs.bug_when"
     current_bug_id = -1
     self.bz_select_sql(sql) do |row|
       ( bug_id,
