@@ -63,8 +63,13 @@ class BugzillaToRedmine
     self.migrate_projects
     self.migrate_versions
     self.migrate_users
+    self.migrate_groups
     self.migrate_members
+    self.migrate_member_roles
+    self.migrate_groups_users
+    self.migrate_categories
     self.migrate_issues
+    self.migrate_watchers
     self.migrate_issue_relations
     self.migrate_attachments
     self.close_connections
@@ -153,11 +158,13 @@ class BugzillaToRedmine
 
   def migrate_users
     ["DELETE FROM users",
-      "DELETE FROM user_preferences",
-      "DELETE FROM members",
-      "DELETE FROM messages",     
-      "DELETE FROM tokens",
-      "DELETE FROM watchers"].each do |sql|
+     "DELETE FROM user_preferences",
+     "DELETE FROM members",
+     "DELETE FROM member_roles",	  
+     "DELETE FROM groups_users",	  	  
+     "DELETE FROM messages",     
+     "DELETE FROM tokens",
+     "DELETE FROM watchers"].each do |sql|
       self.red_exec_sql(sql)
     end
     self.bz_select_sql("SELECT userid, login_name, realname, disabledtext FROM profiles") do |row|
@@ -166,16 +173,16 @@ class BugzillaToRedmine
       real_name = row[2]
       disabled_text = row[3]
       if real_name.nil? 
-        (last_name, first_name) = ['bla', 'bla']
+        (last_name, first_name) = ['empty', 'empty']
       else
         (last_name, first_name) = real_name.split(/[ ,]+/)
         if first_name.to_s.strip.empty?
-          first_name = 'bla'
+          first_name = 'empty'
         end
       end
       status = disabled_text.to_s.strip.empty? ? 1 : 3
-      self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status) values (?, ?, ?, ?, ?, ?, ?, ?)",
-        user_id, login_name, login_name, first_name, last_name, 'en', 0, status)
+      self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        user_id, login_name, login_name, last_name, first_name, 'en', 0, status, 'd033e22ae348aeb5660fc2140aec35850c4da997', 'User')
       other = """---
 :comments_sorting: asc
 :no_self_notified: true
@@ -184,6 +191,14 @@ class BugzillaToRedmine
     end
   end
 
+  def migrate_groups
+    self.bz_select_sql("select name from groups") do |row|
+      name = row[0]
+      self.red_exec_sql("insert into users (lastname, mail_notification, admin, status, type, language) values (?, ?, ?, ?, ?, ?)",
+        name, 1, 0, 1, 'Group', 'en')
+    end
+  end
+  
   def find_version_id(project_id, version)
     result = -1
     self.red_select_sql("select id from versions where project_id=? and name=?", project_id, version) do |row|
@@ -199,12 +214,35 @@ class BugzillaToRedmine
     end
     return bug_when
   end
+  
+  def migrate_categories
+    self.red_exec_sql("delete from issue_categories")
+    self.bz_select_sql("SELECT id, name, product_id AS project_id, initialowner AS assigned_to_id FROM components") do |row|
+      self.red_exec_sql("INSERT INTO issue_categories (id, name, project_id, assigned_to_id) VALUES (?, ?, ?, ?)", row[0], row[1], row[2], row[3])
+    end
+  end
 
- 
+  def migrate_watchers
+    self.red_exec_sql("delete from watchers")
+    self.bz_select_sql("select bug_id, who FROM cc") do |row|
+      self.red_exec_sql("insert into watchers (watchable_type, watchable_id, user_id) values (?, ?, ?)", 'Issue', row[0], row[1])
+    end
+  end
 
+  def insert_custom_fields
+	self.red_exec_sql("delete from custom_fields")
+	self.red_exec_sql("delete from custom_fields_trackers")
+	self.red_exec_sql("delete from custom_values")	
+	self.red_exec_sql("INSERT INTO custom_fields (id, type, name, field_format, possible_values, max_length, is_for_all, is_filter, searchable, default_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 1, 'IssueCustomField', 'URL', 'string', '--- []/n/n', 255, 1, 1, 1, '')
+	[1,2,3].each do |tracker_id|
+      self.red_exec_sql("INSERT INTO custom_fields_trackers (custom_field_id, tracker_id) VALUES (?, ?)", 1, tracker_id)
+    end
+  end
+  
   def migrate_issues
     self.red_exec_sql("delete from issues")
     self.red_exec_sql("delete from journals")
+	self.insert_custom_fields
     sql = "SELECT bugs.bug_id,
 		       bugs.assigned_to,
 		       bugs.bug_status,
@@ -217,6 +255,7 @@ class BugzillaToRedmine
 		       bugs.estimated_time,
 		       bugs.remaining_time,
 		       bugs.deadline,
+			   bugs.target_milestone,
 		       bugs.bug_severity,
 		       bugs.priority,
 		       bugs.component_id,
@@ -244,6 +283,7 @@ class BugzillaToRedmine
         estimated_time,
         remaining_time,
         deadline,
+        target_milestone,
         bug_severity,
         priority,
         component_id,
@@ -258,12 +298,15 @@ class BugzillaToRedmine
         sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         status_id = 1
         version_id = self.find_version_id(product_id, version)
+        target_milestone_id = self.find_version_id(product_id, target_milestone)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = @issuePriorities[priority]
         tracker_id = @issueTrackers[bug_severity]
         status_id = @issueStatus[bug_status]
-        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, version_id, component_id, tracker_id,  status_id)
+        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id,  status_id)
         current_bug_id = bug_id
+        sql = "INSERT INTO custom_values (customized_type, customized_id, custom_field_id, value)  VALUES (?, ?, ?, ?)"
+        self.red_exec_sql(sql, 'Issue', bug_id, 1, url)
       else
         sql = "INSERT INTO journals (id, journalized_id, journalized_type, user_id, notes, created_on)  VALUES (?, ?, ?, ?, ?, ?)"
         self.red_exec_sql(sql, comment_id, bug_id, "Issue", who, thetext, bug_when)
@@ -273,12 +316,11 @@ class BugzillaToRedmine
 
   def migrate_issue_relations
     self.red_exec_sql("delete from issue_relations")
-    sql = "SELECT blocked, dependson FROM dependencies"
+    sql = "SELECT dependson, blocked FROM dependencies"
     self.bz_select_sql(sql) do |row|
       self.red_exec_sql("INSERT INTO issue_relations (issue_from_id, issue_to_id, relation_type) values (?, ?, ?)", row[0], row[1], "blocks")
     end
-
-    sql = "SELECT dupe_of, dupe FROM duplicates"
+    sql = "SELECT dupe, dupe_of FROM duplicates"
     self.bz_select_sql(sql) do |row|
       self.red_exec_sql("INSERT INTO issue_relations (issue_from_id, issue_to_id, relation_type) values (?, ?, ?)", row[0], row[1], "duplicates")
     end
@@ -320,12 +362,35 @@ class BugzillaToRedmine
       role_id = DEFAULT_ROLE_ID
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
-      self.red_exec_sql("INSERT INTO members (user_id, project_id, role_id, created_on, mail_notification) VALUES (?,?,?,?,?)", user_id, product_id, role_id, created_on, mail_notification)
+      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) VALUES (?,?,?,?)", user_id, product_id, created_on, mail_notification)
     end
   end
 
+  def migrate_member_roles
+    self.log("*** migrate member roles ***")
+    self.bz_select_sql("SELECT DISTINCT groups.name, group_control_map.product_id AS project_id FROM group_control_map, groups WHERE groups.id = group_control_map.group_id") do |row|
+      group_name = row[0]
+      product_id = row[1]
+      role_id = DEFAULT_ROLE_ID
+      created_on = "2007-01-01 12:00:00"
+      mail_notification = 0
+      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) select (select id from users where lastname = ?),?,?,?", group_name, product_id, created_on, mail_notification)
+	  self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select (select members.id from members, users where members.user_id = users.id and users.lastname = ?),?,?", group_name, role_id, 0)
+	  self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, (select members.id from members, users where members.user_id = users.id and users.lastname = ?) FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, group_name, product_id, 'User')
+    end
+  end
+
+  def migrate_groups_users
+    self.log("*** migrate groups users ***")
+    self.red_select_sql("select (select members.user_id from members where members.id = mr.inherited_from) as group_id, m.user_id FROM member_roles as mr, members as m where mr.inherited_from is not null and mr.inherited_from <> 0 and mr.member_id = m.id") do |row|
+      group_id = row[0]
+      user_id = row[1]
+      self.red_exec_sql("INSERT INTO groups_users (group_id, user_id) values (?, ?)", group_id, user_id)
+    end
+  end
+  
   def insert_project_trackers(project_id)
-    [1,2,4].each do |tracker_id|
+    [1,2,3].each do |tracker_id|
       self.red_exec_sql("INSERT INTO projects_trackers (project_id, tracker_id) VALUES (?, ?)", project_id, tracker_id)
     end
   end
