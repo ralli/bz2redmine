@@ -119,13 +119,16 @@ class BugzillaToRedmine
   end
 
   def migrate_projects
-    self.bz_select_sql("SELECT products.id, products.name, products.description, products.classification_id, products.disallownew, classifications.name as classification_name FROM products, classifications WHERE products.classification_id = classifications.id") do |row|
+    tree_idx = 1
+    self.bz_select_sql("SELECT products.id, products.name, products.description, products.classification_id, products.disallownew, classifications.name as classification_name FROM products, classifications WHERE products.classification_id = classifications.id order by products.name") do |row|
       identifier = row[1].downcase
       status = row[3] == 1 ? 9 : 1
       created_at = self.find_min_created_at_for_product(row[0])
       updated_at = self.find_max_bug_when_for_product(row[0])
-      self.red_exec_sql("INSERT INTO projects (id, name, description, is_public, identifier, created_on, updated_on, status) values (?, ?, ?, ?, ?, ?, ?, ?)", row[0], row[1], row[2], 1, identifier,
-        created_at, updated_at, status)
+      self.red_exec_sql("INSERT INTO projects (id, name, description, is_public, identifier, created_on, updated_on, status, lft, rgt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", row[0], row[1], row[2], 1, identifier,
+        created_at, updated_at, status, tree_idx, tree_idx+1)
+      tree_idx = tree_idx + 2
+      tree_idx = tree_idx + 2
       self.insert_project_trackers(row[0])
       self.insert_project_modules(row[0])
     end
@@ -301,7 +304,7 @@ class BugzillaToRedmine
         target_milestone_id = self.find_version_id(product_id, target_milestone)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = @issuePriorities[priority]
-        tracker_id = @issueTrackers[bug_severity]
+        tracker_id = @issueTrackers[bug_severity] || 1 # use the "bug" tracker, if the bug severity does not match
         status_id = @issueStatus[bug_status]
         self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id,  status_id)
         current_bug_id = bug_id
