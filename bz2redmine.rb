@@ -27,6 +27,7 @@
 require "rubygems"
 require "mysql"
 require "settings"
+require "digest/sha1"
 
 class ConnectionInfo
   attr_accessor :host
@@ -54,7 +55,10 @@ class BugzillaToRedmine
     @issueTrackers = ISSUE_TRACKERS
 
     # Bugzilla status to Redmine status map
-    @issueStatus = ISSUE_STATUS 
+    @issueStatus = ISSUE_STATUS
+
+    # create hashcode for default password
+    @defaultPassword = Digest::SHA1::hexdigest(REDMINE_DEFAULT_USER_PASSWORD)
   end
 
   def migrate
@@ -186,7 +190,7 @@ class BugzillaToRedmine
       end
       status = disabled_text.to_s.strip.empty? ? 1 : 3
       self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        user_id, login_name, login_name, last_name, first_name, 'en', 0, status, 'd033e22ae348aeb5660fc2140aec35850c4da997', 'User')
+        user_id, login_name, login_name, last_name, first_name, 'en', 0, status, @defaultPassword, 'User')
       other = """---
 :comments_sorting: asc
 :no_self_notified: true

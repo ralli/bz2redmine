@@ -24,6 +24,20 @@ REDMINE_USER=''
 REDMINE_PASSWORD=''
 
 #
+# i found no way to map bugzilla user passwords
+# to redmine user passwords.
+#
+# all migrated users will have this password.
+#
+# technically bugzilla and redmine use different
+# hash algorithms to encode the password. since
+# the passwords are hashed there is no way to decode
+# them.
+#
+
+REDMINE_DEFAULT_USER_PASSWORD = 'redmine'
+
+#
 # this is the path where the attachments 
 # are written to.
 # replace this with your redmine attachment path.
