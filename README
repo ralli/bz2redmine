@@ -35,13 +35,5 @@ needed to finish the migration:
 
 3. Grant administrator permissions to certain users. In this particular case for users with 1, 13 ids;
 update users set admin = true where id in (1, 13);
-4. Activate products (the following update-statements are examples):
-update projects set status = 1, lft = 1, rgt = 2 where id = 1; -- Project 1
-update projects set status = 1, lft = 3, rgt = 4 where id = 2; -- Project 2
-update projects set status = 1, lft = 5, rgt = 6 where id = 3; -- Project 3
-update projects set status = 1, lft = 7, rgt = 8 where id = 4; -- Project 4
-update projects set status = 1, lft = 9, rgt = 10 where id = 5; -- Project 5
-update projects set status = 1, lft = 11, rgt = 12 where id = 6; -- Project 6
-update projects set status = 1, lft = 13, rgt = 14 where id = 7; -- Project 7
  
 
