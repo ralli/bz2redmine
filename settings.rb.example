@@ -73,12 +73,19 @@ ISSUE_TRACKERS = {
 # please check the contents of the "bug_status"-Table 
 # in your bugzilla database
 #
+# please note that redmine does not have a "REOPENED" state
+# by default. the default settings below map reopened bugs
+# to the "new" state. If you would like to have a REOPENED state.
+# just add a new state on the redmine administration pages and
+# change the "REOPENED" entry accordingly
+# (normally to "REOPENED"      => 7)
+#
 
 ISSUE_STATUS = {
   "UNCONFIRMED"   => 1,
   "NEW"           => 1,
   "ASSIGNED"      => 2,
-  "REOPENED"      => 7,
+  "REOPENED"      => 1,
   "RESOLVED"      => 5,
   "VERIFIED"      => 2,
   "CLOSED"        => 5

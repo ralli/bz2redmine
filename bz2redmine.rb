@@ -59,6 +59,7 @@ class BugzillaToRedmine
 
   def migrate
     self.open_connections
+    self.perform_sanity_checks
     self.clear_redmine_tables
     self.migrate_projects
     self.migrate_versions
@@ -161,13 +162,13 @@ class BugzillaToRedmine
 
   def migrate_users
     ["DELETE FROM users",
-     "DELETE FROM user_preferences",
-     "DELETE FROM members",
-     "DELETE FROM member_roles",	  
-     "DELETE FROM groups_users",	  	  
-     "DELETE FROM messages",     
-     "DELETE FROM tokens",
-     "DELETE FROM watchers"].each do |sql|
+      "DELETE FROM user_preferences",
+      "DELETE FROM members",
+      "DELETE FROM member_roles",
+      "DELETE FROM groups_users",
+      "DELETE FROM messages",
+      "DELETE FROM tokens",
+      "DELETE FROM watchers"].each do |sql|
       self.red_exec_sql(sql)
     end
     self.bz_select_sql("SELECT userid, login_name, realname, disabledtext FROM profiles") do |row|
@@ -233,11 +234,11 @@ class BugzillaToRedmine
   end
 
   def insert_custom_fields
-	self.red_exec_sql("delete from custom_fields")
-	self.red_exec_sql("delete from custom_fields_trackers")
-	self.red_exec_sql("delete from custom_values")	
-	self.red_exec_sql("INSERT INTO custom_fields (id, type, name, field_format, possible_values, max_length, is_for_all, is_filter, searchable, default_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 1, 'IssueCustomField', 'URL', 'string', '--- []/n/n', 255, 1, 1, 1, '')
-	[1,2,3].each do |tracker_id|
+    self.red_exec_sql("delete from custom_fields")
+    self.red_exec_sql("delete from custom_fields_trackers")
+    self.red_exec_sql("delete from custom_values")  
+    self.red_exec_sql("INSERT INTO custom_fields (id, type, name, field_format, possible_values, max_length, is_for_all, is_filter, searchable, default_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 1, 'IssueCustomField', 'URL', 'string', '--- []/n/n', 255, 1, 1, 1, '')
+    [1,2,3].each do |tracker_id|
       self.red_exec_sql("INSERT INTO custom_fields_trackers (custom_field_id, tracker_id) VALUES (?, ?)", 1, tracker_id)
     end
   end
@@ -245,33 +246,33 @@ class BugzillaToRedmine
   def migrate_issues
     self.red_exec_sql("delete from issues")
     self.red_exec_sql("delete from journals")
-	self.insert_custom_fields
+    self.insert_custom_fields
     sql = "SELECT bugs.bug_id,
-		       bugs.assigned_to,
-		       bugs.bug_status,
-		       bugs.creation_ts,
-		       bugs.short_desc,
-		       bugs.product_id,
-		       bugs.reporter,
-		       bugs.version,
-		       bugs.resolution,
-		       bugs.estimated_time,
-		       bugs.remaining_time,
-		       bugs.deadline,
-			   bugs.target_milestone,
-		       bugs.bug_severity,
-		       bugs.priority,
-		       bugs.component_id,
-		       bugs.status_whiteboard AS whiteboard,
-		       bugs.bug_file_loc AS url,
-		       longdescs.comment_id,
-		       longdescs.thetext,
-		       longdescs.bug_when,
-		       longdescs.who,
-		       longdescs.isprivate
-		   FROM bugs, longdescs
-		   WHERE bugs.bug_id = longdescs.bug_id
-		   ORDER BY bugs.bug_id, longdescs.bug_when"
+               bugs.assigned_to,
+               bugs.bug_status,
+               bugs.creation_ts,
+               bugs.short_desc,
+               bugs.product_id,
+               bugs.reporter,
+               bugs.version,
+               bugs.resolution,
+               bugs.estimated_time,
+               bugs.remaining_time,
+               bugs.deadline,
+               bugs.target_milestone,
+               bugs.bug_severity,
+               bugs.priority,
+               bugs.component_id,
+               bugs.status_whiteboard AS whiteboard,
+               bugs.bug_file_loc AS url,
+               longdescs.comment_id,
+               longdescs.thetext,
+               longdescs.bug_when,
+               longdescs.who,
+               longdescs.isprivate
+           FROM bugs, longdescs
+           WHERE bugs.bug_id = longdescs.bug_id
+           ORDER BY bugs.bug_id, longdescs.bug_when"
     current_bug_id = -1
     self.bz_select_sql(sql) do |row|
       ( bug_id,
@@ -299,14 +300,12 @@ class BugzillaToRedmine
         isprivate) = row
       if(current_bug_id != bug_id)
         sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        status_id = 1
-        version_id = self.find_version_id(product_id, version)
         target_milestone_id = self.find_version_id(product_id, target_milestone)
         updated_at = self.find_max_bug_when(bug_id)
-        priority_id = @issuePriorities[priority]
-        tracker_id = @issueTrackers[bug_severity] || 1 # use the "bug" tracker, if the bug severity does not match
-        status_id = @issueStatus[bug_status]
-        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id,  status_id)
+        priority_id = map_priority(bug_id, priority)
+        tracker_id = map_tracker(bug_id, bug_severity)
+        status_id = map_status(bug_id, bug_status)
+        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id)
         current_bug_id = bug_id
         sql = "INSERT INTO custom_values (customized_type, customized_id, custom_field_id, value)  VALUES (?, ?, ?, ?)"
         self.red_exec_sql(sql, 'Issue', bug_id, 1, url)
@@ -315,6 +314,22 @@ class BugzillaToRedmine
         self.red_exec_sql(sql, comment_id, bug_id, "Issue", who, thetext, bug_when)
       end
     end
+  end
+
+  def map_priority(bug_id, priority)
+    priority_id = @issuePriorities[priority]
+    throw "bugzilla bug #{bug_id}: cannot map the issue priority #{priority}." if priority_id.nil?
+    return priority_id
+  end
+
+  def map_tracker(bug_id, bug_severity)
+    return @issueTrackers[bug_severity] || 1 # use the "bug" tracker, if the bug severity does not match
+  end
+
+  def map_status(bug_id, bug_status)
+    status_id = @issueStatus[bug_status]
+    throw "bugzilla bug #{bug_id}: cannot map the issue priority #{bug_status}." if status_id.nil?
+    return status_id
   end
 
   def migrate_issue_relations
@@ -378,8 +393,8 @@ class BugzillaToRedmine
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
       self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) select (select id from users where lastname = ?),?,?,?", group_name, product_id, created_on, mail_notification)
-	  self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select (select members.id from members, users where members.user_id = users.id and users.lastname = ?),?,?", group_name, role_id, 0)
-	  self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, (select members.id from members, users where members.user_id = users.id and users.lastname = ?) FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, group_name, product_id, 'User')
+      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select (select members.id from members, users where members.user_id = users.id and users.lastname = ?),?,?", group_name, role_id, 0)
+      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, (select members.id from members, users where members.user_id = users.id and users.lastname = ?) FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, group_name, product_id, 'User')
     end
   end
 
@@ -411,10 +426,6 @@ class BugzillaToRedmine
     end
   end
 
-  def bz_exec_sql(sql)
-    self.log("bugzilla: #{sql}")
-  end
-
   def bz_select_sql(sql, *args, &block)
     self.log("bugzilla: #{sql} args=#{args.join(',')}")
     statement = @bugzilladb.prepare(sql)
@@ -441,6 +452,106 @@ class BugzillaToRedmine
     end
     statement.close()
   end
+
+  def perform_sanity_checks
+    verify_bug_priorities()
+    verify_bug_status()
+    verify_bug_severities()
+    verify_trackers()
+    verify_issue_statuses()
+    verify_issue_priorities()
+  end
+
+  def make_query_string(strings)
+    quoted_strings = strings.collect {|s| s.to_s. sub(/^(.*)$/, '\'\1\'') }
+    return "(#{quoted_strings.join(", ")})"
+  end
+
+  def verify_bug_priorities
+    self.log("checking bug priorities...")
+    sql = "select bug_id, priority from bugs where priority not in #{make_query_string(ISSUE_PRIORITIES.keys)}"
+    count = 0
+    self.bz_select_sql(sql) do |row|
+      (bug_id, priority) = row
+      puts "bug #{bug_id}: unknown bug priority #{priority}."
+      count += 1
+    end
+    if count > 0
+      throw "there are bug priorities, which cannot be mapped. please modify the ISSUE_PRIORITIES in settings.rb accordingly."
+    end
+  end
+
+  def verify_bug_status
+    self.log("checking bug status...")
+    sql = "select bug_id, bug_status from bugs where bug_status not in #{make_query_string(ISSUE_STATUS.keys)}"
+    count = 0
+    self.bz_select_sql(sql) do |row|
+      (bug_id, bug_status) = row
+      puts "bug #{bug_id}: unknown bug status #{bug_status}."
+      count += 1
+    end
+    if count > 0
+      throw "there are bug priorities, which cannot be mapped. please modify the ISSUE_STATUS in settings.rb accordingly."
+    end
+  end
+
+  def verify_bug_status
+    self.log("checking bug status...")
+    sql = "select bug_id, bug_status from bugs where bug_status not in #{make_query_string(ISSUE_STATUS.keys)}"
+    count = 0
+    self.bz_select_sql(sql) do |row|
+      (bug_id, bug_status) = row
+      puts "bug #{bug_id}: unknown bug status #{bug_status}."
+      count += 1
+    end
+    if count > 0
+      throw "there are bug priorities, which cannot be mapped. please modify the ISSUE_STATUS in settings.rb accordingly."
+    end
+  end
+
+  def verify_bug_severities
+    self.log("checking bug status...")
+    sql = "select bug_id, bug_severity from bugs where bug_severity not in #{make_query_string(ISSUE_TRACKERS.keys)}"
+    count = 0
+    self.bz_select_sql(sql) do |row|
+      (bug_id, bug_severity) = row
+      puts "bug #{bug_id}: unknown bug severity #{bug_severity}."
+      count += 1
+    end
+    if count > 0
+      throw "there are bug priorities, which cannot be mapped. please modify the ISSUE_TRACKERS in settings.rb accordingly."
+    end
+  end
+
+  def red_check_exists(sql, *args)
+    self.red_select_sql(sql, *args) { |i|  return true }
+    return false
+  end
+  
+  def verify_trackers
+    ISSUE_TRACKERS.values.uniq.each do |id|
+       unless red_check_exists("select id from trackers where id=?", id)
+         throw "cannot find tracker in trackers table with id #{id}"
+       end
+    end
+  end
+
+  def verify_issue_statuses
+    ISSUE_STATUS.values.uniq.each do |id|
+       unless red_check_exists("select id from issue_statuses where id=?", id)
+         throw "cannot find status in issue_statuses table with id #{id}"
+       end
+    end
+  end
+
+  def verify_issue_priorities
+    ISSUE_PRIORITIES.values.uniq.each do |id|
+       unless red_check_exists("select id from enumerations where id=?", id)
+         throw "cannot find issue priority in enumerations table with id=#{id}"
+       end
+    end
+  end
+
 end
 
 begin
