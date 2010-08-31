@@ -125,7 +125,7 @@ class BugzillaToRedmine
 
   def migrate_projects
     tree_idx = 1
-    self.bz_select_sql("SELECT products.id, products.name, products.description, products.classification_id, products.disallownew, classifications.name as classification_name FROM products, classifications WHERE products.classification_id = classifications.id order by products.name") do |row|
+    self.bz_select_sql("SELECT products.id, products.name, products.description, products.classification_id, classifications.name as classification_name FROM products, classifications WHERE products.classification_id = classifications.id order by products.name") do |row|
       identifier = row[1].downcase
       status = row[3] == 1 ? 9 : 1
       created_at = self.find_min_created_at_for_product(row[0])
@@ -303,13 +303,13 @@ class BugzillaToRedmine
         who,
         isprivate) = row
       if(current_bug_id != bug_id)
-        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id, root_id, lft, rgt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         target_milestone_id = self.find_version_id(product_id, target_milestone)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = map_priority(bug_id, priority)
         tracker_id = map_tracker(bug_id, bug_severity)
         status_id = map_status(bug_id, bug_status)
-        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id)
+        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id, bug_id, 1, 2)
         current_bug_id = bug_id
         sql = "INSERT INTO custom_values (customized_type, customized_id, custom_field_id, value)  VALUES (?, ?, ?, ?)"
         self.red_exec_sql(sql, 'Issue', bug_id, 1, url)
