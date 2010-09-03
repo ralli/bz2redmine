@@ -304,7 +304,7 @@ class BugzillaToRedmine
         isprivate) = row
       if(current_bug_id != bug_id)
         sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id, root_id, lft, rgt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        target_milestone_id = self.find_version_id(product_id, target_milestone)
+        target_milestone_id = self.find_version_id(product_id, version)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = map_priority(bug_id, priority)
         tracker_id = map_tracker(bug_id, bug_severity)
