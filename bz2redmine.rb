@@ -3,26 +3,26 @@
 # Copyright (c) 2009, Ralph Juhnke
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms, with or without modification, 
+# Redistribution and use in source and binary forms, with or without modification,
 # are permitted provided that the following conditions are met:
 #
-#    1. Redistributions of source code must retain the above copyright notice, 
+#    1. Redistributions of source code must retain the above copyright notice,
 #       this list of conditions and the following disclaimer.
-#    2. Redistributions in binary form must reproduce the above copyright notice, 
+#    2. Redistributions in binary form must reproduce the above copyright notice,
 #       this list of conditions and the following disclaimer in the documentation and/or other
 #       materials provided with the distribution.
-# 
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO 
-# EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
-# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, 
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+# EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# 
+#
 
 require "rubygems"
 require "mysql"
@@ -180,7 +180,7 @@ class BugzillaToRedmine
       login_name = row[1]
       real_name = row[2]
       disabled_text = row[3]
-      if real_name.nil? 
+      if real_name.nil?
         (last_name, first_name) = ['empty', 'empty']
       else
         (last_name, first_name) = real_name.split(/[ ,]+/)
@@ -190,7 +190,7 @@ class BugzillaToRedmine
       end
       status = disabled_text.to_s.strip.empty? ? 1 : 3
       self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        user_id, login_name, login_name, last_name, first_name, 'en', 0, status, @defaultPassword, 'User')
+        user_id, login_name, login_name, last_name, first_name, 'en', 'only_my_events', status, @defaultPassword, 'User')
       other = """---
 :comments_sorting: asc
 :no_self_notified: true
@@ -203,10 +203,10 @@ class BugzillaToRedmine
     self.bz_select_sql("select name from groups") do |row|
       name = row[0]
       self.red_exec_sql("insert into users (lastname, mail_notification, admin, status, type, language) values (?, ?, ?, ?, ?, ?)",
-        name, 1, 0, 1, 'Group', 'en')
+        name, 'only_my_events', 0, 1, 'Group', 'en')
     end
   end
-  
+
   def find_version_id(project_id, version)
     result = -1
     self.red_select_sql("select id from versions where project_id=? and name=?", project_id, version) do |row|
@@ -222,7 +222,7 @@ class BugzillaToRedmine
     end
     return bug_when
   end
-  
+
   def migrate_categories
     self.red_exec_sql("delete from issue_categories")
     self.bz_select_sql("SELECT id, name, product_id AS project_id, initialowner AS assigned_to_id FROM components") do |row|
@@ -240,13 +240,13 @@ class BugzillaToRedmine
   def insert_custom_fields
     self.red_exec_sql("delete from custom_fields")
     self.red_exec_sql("delete from custom_fields_trackers")
-    self.red_exec_sql("delete from custom_values")  
+    self.red_exec_sql("delete from custom_values")
     self.red_exec_sql("INSERT INTO custom_fields (id, type, name, field_format, possible_values, max_length, is_for_all, is_filter, searchable, default_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 1, 'IssueCustomField', 'URL', 'string', '--- []/n/n', 255, 1, 1, 1, '')
     [1,2,3].each do |tracker_id|
       self.red_exec_sql("INSERT INTO custom_fields_trackers (custom_field_id, tracker_id) VALUES (?, ?)", 1, tracker_id)
     end
   end
-  
+
   def migrate_issues
     self.red_exec_sql("delete from issues")
     self.red_exec_sql("delete from journals")
@@ -362,11 +362,11 @@ class BugzillaToRedmine
       end
     end
   end
-  
+
   def get_disk_filename(attach_id, filename)
     return "a#{attach_id}.#{self.get_file_extension(filename)}".downcase
   end
-    
+
   def get_file_extension(s)
     m = /\.(\w+)$/.match(s)
     if(m)
@@ -410,7 +410,7 @@ class BugzillaToRedmine
       self.red_exec_sql("INSERT INTO groups_users (group_id, user_id) values (?, ?)", group_id, user_id)
     end
   end
-  
+
   def insert_project_trackers(project_id)
     [1,2,3].each do |tracker_id|
       self.red_exec_sql("INSERT INTO projects_trackers (project_id, tracker_id) VALUES (?, ?)", project_id, tracker_id)
@@ -531,7 +531,7 @@ class BugzillaToRedmine
     self.red_select_sql(sql, *args) { |i|  return true }
     return false
   end
-  
+
   def verify_trackers
     ISSUE_TRACKERS.values.uniq.each do |id|
        unless red_check_exists("select id from trackers where id=?", id)
@@ -565,3 +565,4 @@ rescue => e
   puts e.inspect
   puts e.backtrace
 end
+
