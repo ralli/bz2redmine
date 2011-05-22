@@ -388,6 +388,22 @@ class BugzillaToRedmine
     end
   end
 
+  def select_group_id(group_name)
+    result = nil
+    red_select_sql("select id from users where lastname=? and type=?", group_name, 'Group') do |row|
+      result = row[0]
+    end
+    result
+  end
+
+  def select_last_insert_id
+    result = 0
+    red_select_sql("select last_insert_id()") do |row|
+      result = row[0]
+    end
+    result
+  end
+
   def migrate_member_roles
     self.log("*** migrate member roles ***")
     self.bz_select_sql("SELECT DISTINCT groups.name, group_control_map.product_id AS project_id FROM group_control_map, groups WHERE groups.id = group_control_map.group_id") do |row|
@@ -396,9 +412,11 @@ class BugzillaToRedmine
       role_id = DEFAULT_ROLE_ID
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
-      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) select (select id from users where lastname = ?),?,?,?", group_name, product_id, created_on, mail_notification)
-      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select (select members.id from members, users where members.user_id = users.id and users.lastname = ?),?,?", group_name, role_id, 0)
-      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, (select members.id from members, users where members.user_id = users.id and users.lastname = ?) FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, group_name, product_id, 'User')
+      group_id = select_group_id(group_name)
+      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) ?,?,?,?", group_id, product_id, created_on, mail_notification)
+      member_id_of_group = select_last_insert_id()
+      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) ?,?,?", member_id_of_group, role_id, 0)
+      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, ? FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, member_id_of_group, product_id, 'User')
     end
   end
 
