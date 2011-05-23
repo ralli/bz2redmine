@@ -413,16 +413,16 @@ class BugzillaToRedmine
       created_on = "2007-01-01 12:00:00"
       mail_notification = 0
       group_id = select_group_id(group_name)
-      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) ?,?,?,?", group_id, product_id, created_on, mail_notification)
+      self.red_exec_sql("INSERT INTO members (user_id, project_id, created_on, mail_notification) values (?,?,?,?)", group_id, product_id, created_on, mail_notification)
       member_id_of_group = select_last_insert_id()
-      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) ?,?,?", member_id_of_group, role_id, 0)
+      self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) values (?,?,?)", member_id_of_group, role_id, 0)
       self.red_exec_sql("INSERT INTO member_roles (member_id, role_id, inherited_from) select members.id, ?, ? FROM members,users where members.project_id = ? and members.user_id = users.id and users.type = ?", role_id, member_id_of_group, product_id, 'User')
     end
   end
 
   def migrate_groups_users
     self.log("*** migrate groups users ***")
-    self.red_select_sql("select (select members.user_id from members where members.id = mr.inherited_from) as group_id, m.user_id FROM member_roles as mr, members as m where mr.inherited_from is not null and mr.inherited_from <> 0 and mr.member_id = m.id") do |row|
+    self.red_select_sql("select distinct (select members.user_id from members where members.id = mr.inherited_from) as group_id, m.user_id FROM member_roles as mr, members as m where mr.inherited_from is not null and mr.inherited_from <> 0 and mr.member_id = m.id") do |row|
       group_id = row[0]
       user_id = row[1]
       self.red_exec_sql("INSERT INTO groups_users (group_id, user_id) values (?, ?)", group_id, user_id)
