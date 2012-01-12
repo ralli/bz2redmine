@@ -100,7 +100,6 @@ class BugzillaToRedmine
     db.real_connect(info.host, info.user, info.password, info.dbname)
     db.query("SET NAMES utf8")
     return db
-    #return Mysql::new(info.host, info.user, info.password, info.dbname)
   end
 
   def clear_redmine_tables
@@ -351,7 +350,7 @@ class BugzillaToRedmine
         priority_id = map_priority(bug_id, priority)
         tracker_id = map_tracker(bug_id, bug_severity)
         status_id = map_status(bug_id, bug_status)
-        done_ratio = estimated_time.to_f == 0 ? 0.00 : ((estimated_time.to_f - remaining_time.to_f)/estimated_time.to_f)*100
+        done_ratio = estimated_time.to_f.abs < 1e-3 ? 0.00 : ((estimated_time.to_f - remaining_time.to_f)/estimated_time.to_f)*100
         self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, deadline, done_ratio, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id, bug_id, 1, 2)
         current_bug_id = bug_id
         sql = "INSERT INTO custom_values (customized_type, customized_id, custom_field_id, value)  VALUES (?, ?, ?, ?)"
