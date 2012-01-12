@@ -58,7 +58,8 @@ class BugzillaToRedmine
     @issueStatus = ISSUE_STATUS
 
     # create hashcode for default password
-    @defaultPassword = Digest::SHA1::hexdigest(REDMINE_DEFAULT_USER_PASSWORD)
+    @passwordSalt = "" 
+    @defaultPassword = Digest::SHA1::hexdigest(@passwordSalt+Digest::SHA1::hexdigest(REDMINE_DEFAULT_USER_PASSWORD))
   end
 
   def migrate
@@ -74,6 +75,7 @@ class BugzillaToRedmine
     self.migrate_groups_users
     self.migrate_categories
     self.migrate_issues
+    self.migrate_time_entries
     self.migrate_watchers
     self.migrate_issue_relations
     self.migrate_attachments
@@ -93,7 +95,12 @@ class BugzillaToRedmine
 
   def open_connection(info)
     self.log "opening #{info.inspect}"
-    return Mysql::new(info.host, info.user, info.password, info.dbname)
+    db = Mysql.init
+    db.options(Mysql::SET_CHARSET_NAME, 'utf8')
+    db.real_connect(info.host, info.user, info.password, info.dbname)
+    db.query("SET NAMES utf8")
+    return db
+    #return Mysql::new(info.host, info.user, info.password, info.dbname)
   end
 
   def clear_redmine_tables
@@ -189,8 +196,8 @@ class BugzillaToRedmine
         end
       end
       status = disabled_text.to_s.strip.empty? ? 1 : 3
-      self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        user_id, login_name, login_name, last_name, first_name, 'en', 'only_my_events', status, @defaultPassword, 'User')
+      self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type, salt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        user_id, login_name, login_name, last_name, first_name, 'en', 'only_my_events', status, @defaultPassword, 'User', @passwordSalt)
       other = """---
 :comments_sorting: asc
 :no_self_notified: true
@@ -247,6 +254,41 @@ class BugzillaToRedmine
     end
   end
 
+  def migrate_time_entries
+   self.red_exec_sql("delete from time_entries")
+   self.bz_select_sql("select
+  			b.product_id as project_id,
+  			a.who as user_id,
+  			a.bug_id as issue_id,
+  			a.work_time as hours,
+  			substr(a.thetext,1,255) as comments,
+  			9 as activity_id,
+  			date(bug_when) as spent_on,
+  			year(bug_when) as tyear,
+  			month(bug_when) as tmonth,
+  			week(bug_when) as tweek,
+  			bug_when as created_on,
+  			bug_when as updated_on
+  		from
+  			longdescs a inner join bugs b on b.bug_id = a.bug_id
+  		where work_time <> 0") do |row|
+    project_id = row[0]
+    user_id = row[1]
+    issue_id = row[2]
+    hours = row[3]
+    comments = row[4]
+    activity_id = row[5]
+    spent_on = row[6]
+    tyear = row[7]
+    tmonth = row[8]
+    tweek = row[9]
+    created_on = row[10]
+    updated_on = row[11]
+    self.red_exec_sql("insert into time_entries (project_id, user_id, issue_id, hours, comments, activity_id, spent_on, tyear, tmonth, tweek, created_on, updated_on) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      project_id, user_id, issue_id, hours, comments, activity_id, spent_on, tyear, tmonth, tweek, created_on, updated_on)
+  end
+ end
+
   def migrate_issues
     self.red_exec_sql("delete from issues")
     self.red_exec_sql("delete from journals")
@@ -293,7 +335,7 @@ class BugzillaToRedmine
         deadline,
         target_milestone,
         bug_severity,
-        priority,
+         priority,
         component_id,
         whiteboard,
         url,
@@ -303,13 +345,14 @@ class BugzillaToRedmine
         who,
         isprivate) = row
       if(current_bug_id != bug_id)
-        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id, root_id, lft, rgt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        sql = "INSERT INTO issues (id, project_id, subject, description, assigned_to_id, author_id, created_on, updated_on, start_date, due_date, done_ratio, estimated_hours, priority_id, fixed_version_id, category_id, tracker_id, status_id, root_id, lft, rgt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         target_milestone_id = self.find_version_id(product_id, version)
         updated_at = self.find_max_bug_when(bug_id)
         priority_id = map_priority(bug_id, priority)
         tracker_id = map_tracker(bug_id, bug_severity)
         status_id = map_status(bug_id, bug_status)
-        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id, bug_id, 1, 2)
+        done_ratio = estimated_time.to_f == 0 ? 0.00 : ((estimated_time.to_f - remaining_time.to_f)/estimated_time.to_f)*100
+        self.red_exec_sql(sql, bug_id, product_id, short_desc, thetext, assigned_to, reporter, creation_ts,  updated_at, creation_ts, deadline, done_ratio, estimated_time, priority_id, target_milestone_id, component_id, tracker_id, status_id, bug_id, 1, 2)
         current_bug_id = bug_id
         sql = "INSERT INTO custom_values (customized_type, customized_id, custom_field_id, value)  VALUES (?, ?, ?, ?)"
         self.red_exec_sql(sql, 'Issue', bug_id, 1, url)
