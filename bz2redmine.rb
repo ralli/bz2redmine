@@ -26,7 +26,7 @@
 
 require "rubygems"
 require "mysql"
-require "settings"
+require File.join(File.dirname(__FILE__), "settings")
 require "digest/sha1"
 
 class ConnectionInfo
