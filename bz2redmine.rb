@@ -193,6 +193,9 @@ class BugzillaToRedmine
         if first_name.to_s.strip.empty?
           first_name = 'empty'
         end
+        if last_name.to_s.strip.empty?
+          last_name = 'empty'
+        end
       end
       status = disabled_text.to_s.strip.empty? ? 1 : 3
       self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type, salt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
