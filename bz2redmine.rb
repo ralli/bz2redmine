@@ -181,7 +181,21 @@ class BugzillaToRedmine
       "DELETE FROM watchers"].each do |sql|
       self.red_exec_sql(sql)
     end
-    self.bz_select_sql("SELECT userid, login_name, realname, disabledtext FROM profiles") do |row|
+
+    if not REDMINE_DEFAULT_AUTH_SOURCE_ID.nil?
+      ldap = Net::LDAP.new :host => REDMINE_LDAP['host'], # your LDAP host name or IP goes here,
+        :port => REDMINE_LDAP['port'], # your LDAP host port goes here,
+        :base => REDMINE_LDAP['base'], # the base of your AD tree goes here,
+        :auth => {
+          :method => :simple,
+          :username => REDMINE_LDAP['bind_user'], # a user w/sufficient privileges to read from AD goes here,
+          :password => REDMINE_LDAP['bind_pass'] # the user's password goes here
+        }	
+
+      raise "LDAP bind failed." unless ldap.bind
+    end
+
+    self.bz_select_sql("SELECT userid, login_name, realname, disabledtext, extern_id FROM profiles") do |row|
       user_id = row[0]
       login_name = row[1]
       real_name = row[2]
@@ -197,9 +211,24 @@ class BugzillaToRedmine
           last_name = 'empty'
         end
       end
+
       status = disabled_text.to_s.strip.empty? ? 1 : 3
-      self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type, salt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        user_id, login_name, login_name, last_name, first_name, 'en', 'only_my_events', status, @defaultPassword, 'User', @passwordSalt)
+
+      if not extern_id.nil? and not REDMINE_DEFAULT_AUTH_SOURCE_ID.nil?
+	search_filter = Net::LDAP::Filter.eq(REDMINE_LDAP['email_attr'], login_name)
+        self.log("Searching LDAP for %s" % login_name)
+        result = ldap.search(:filter => search_filter, :attributes => [REDMINE_LDAP['login_attr']], :return_result => true) do |user|
+          self.log("User found in LDAP")
+          self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, type, auth_source_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            user_id, user[REDMINE_LDAP['login_attr']].first, login_name, last_name, first_name, 'en', 'only_my_events', status, 'User', REDMINE_DEFAULT_AUTH_SOURCE_ID)
+	end
+      end
+
+      if result.nil? or extern_id.nil?
+        self.red_exec_sql("INSERT INTO users (id, login, mail, firstname, lastname, language, mail_notification, status, hashed_password, type, salt) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          user_id, login_name, login_name, last_name, first_name, 'en', 'only_my_events', status, @defaultPassword, 'User', @passwordSalt)
+      end
+
       other = """---
 :comments_sorting: asc
 :no_self_notified: true
@@ -212,7 +241,7 @@ class BugzillaToRedmine
     self.bz_select_sql("select name from groups") do |row|
       name = row[0]
       self.red_exec_sql("insert into users (lastname, mail_notification, admin, status, type, language) values (?, ?, ?, ?, ?, ?)",
-        name, 'only_my_events', 0, 1, 'Group', 'en')
+        name, 'only_my_events', (name == 'admin' ? 1 : 0) , 1, 'Group', 'en')
     end
   end
 
@@ -540,7 +569,7 @@ class BugzillaToRedmine
     count = 0
     self.bz_select_sql(sql) do |row|
       (bug_id, priority) = row
-      puts "bug #{bug_id}: unknown bug priority #{priority}."
+      self.log "bug #{bug_id}: unknown bug priority #{priority}."
       count += 1
     end
     if count > 0
@@ -554,7 +583,7 @@ class BugzillaToRedmine
     count = 0
     self.bz_select_sql(sql) do |row|
       (bug_id, bug_status) = row
-      puts "bug #{bug_id}: unknown bug status #{bug_status}."
+      self.log "bug #{bug_id}: unknown bug status #{bug_status}."
       count += 1
     end
     if count > 0
@@ -568,7 +597,7 @@ class BugzillaToRedmine
     count = 0
     self.bz_select_sql(sql) do |row|
       (bug_id, bug_status) = row
-      puts "bug #{bug_id}: unknown bug status #{bug_status}."
+      self.log "bug #{bug_id}: unknown bug status #{bug_status}."
       count += 1
     end
     if count > 0
@@ -582,7 +611,7 @@ class BugzillaToRedmine
     count = 0
     self.bz_select_sql(sql) do |row|
       (bug_id, bug_severity) = row
-      puts "bug #{bug_id}: unknown bug severity #{bug_severity}."
+      self.log "bug #{bug_id}: unknown bug severity #{bug_severity}."
       count += 1
     end
     if count > 0
