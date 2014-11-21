@@ -37,6 +37,23 @@ REDMINE_PASSWORD=''
 
 REDMINE_DEFAULT_USER_PASSWORD = 'redmine'
 
+# Convert LDAP based Bugzilla accounts to use an LDAP Auth Source in Redmine
+# Set REDMINE_DEFAULT_AUTH_SOURCE_ID to nil to disable LDAP lookups
+# Set REDMINE_DEFUALT_AUTH_SOURCE_ID to the id of the LDAP auth source you configure in Redmine
+REDMINE_DEFAULT_AUTH_SOURCE_ID = nil
+
+# LDAP server to query for the bugzilla accounts email address
+REDMINE_LDAP = {
+  'host' => 'example.com',
+  'port' => '389',
+  'base' => 'DC=EXAMPLE,DC=COM',
+  'bind_user' => 'user@example.com',
+  'bind_pass' => 'password',
+  'email_attr' => 'mail',
+  'login_attr' => 'sAMAccountName'
+}
+
+
 #
 # this is the path where the attachments 
 # are written to.
