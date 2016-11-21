@@ -476,11 +476,13 @@ class BugzillaToRedmine
   def migrate_issue_relations
     self.log("Migrate Issue relations")
     self.red_exec_sql("delete from issue_relations")
-    self.bz_select_sql("SELECT dependson, blocked FROM dependencies") do |row|
-      self.red_exec_sql("INSERT INTO issue_relations (issue_from_id, issue_to_id, relation_type) values (?, ?, ?)", row["dependson"], row["blocked"], "blocks")
-    end
-    self.bz_select_sql("SELECT dupe, dupe_of FROM duplicates") do |row|
-      self.red_exec_sql("INSERT INTO issue_relations (issue_from_id, issue_to_id, relation_type) values (?, ?, ?)", row["dupe"], row["dupe_of"], "duplicates")
+	  
+   # Changed SQL to exclude when a bug is markerd as bloks and duplicates in the same bug
+   sql = "SELECT a,b,MAX(t) as t FROM (
+			SELECT dependson as a, blocked as b,'blocks' as t FROM dependencies UNION ALL
+			SELECT dupe as a, dupe_of as b, 'duplicates' as t FROM duplicates) as x GROUP BY a,b"
+    self.bz_select_sql(sql) do |row|
+      self.red_exec_sql("INSERT INTO issue_relations (issue_from_id, issue_to_id, relation_type) values (?, ?, ?)", row["a"], row["b"], row["t"])
     end
   end
 
