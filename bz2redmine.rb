@@ -517,9 +517,9 @@ class BugzillaToRedmine
 
   def select_last_insert_id
     result = 0
-    red_select_sql("select last_insert_id()") do |row|
+    red_select_sql("select last_insert_id() as ct") do |row|
 		self.log("LAST_INSERT_ID: #{row}")
-      result = row[0]
+      result = row["ct"]
     end
     result
   end
