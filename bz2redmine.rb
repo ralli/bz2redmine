@@ -66,8 +66,8 @@ class BugzillaToRedmine
     # Bugzilla status to Redmine status map
     @issueStatus = ISSUE_STATUS
 
-	# User default lang
-	@defaultLanguage = REDMINE_DEFAULT_LANG
+    # User default lang
+    @defaultLanguage = REDMINE_DEFAULT_LANG
 	
     # create hashcode for default password
     @passwordSalt = "" 
@@ -82,20 +82,20 @@ class BugzillaToRedmine
     self.perform_sanity_checks
 	
 	# BLOCK: Base, projects and versions
-    # self.clear_redmine_tables
-    # self.migrate_projects
-    # self.migrate_versions
+     self.clear_redmine_tables
+     self.migrate_projects
+     self.migrate_versions
 	
 	# BLOCK: Uses
-	#self.clear_redmine_users
-    #self.migrate_users
-    #self.migrate_groups
-    #self.migrate_members
-    #self.migrate_member_roles
-    #self.migrate_groups_users
+    self.clear_redmine_users
+    self.migrate_users
+    self.migrate_groups
+    self.migrate_members
+    self.migrate_member_roles
+    self.migrate_groups_users
 	
 	# BLOCK: Issues
-	#self.migrate_categories
+    self.migrate_categories
     self.migrate_issues
     self.migrate_time_entries
     self.migrate_watchers
