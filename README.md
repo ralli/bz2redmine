@@ -23,6 +23,7 @@ Features
 * Preserves the Bugzilla bug numbers
 * Converts most of the existing Bugzilla data including attachments
 * Has been successfully used to convert a Bugzilla 4.2.1 to Redmine 3.3
+* This fork uses the new __mysql2__ Driver to provide performance. (__mysql__ is deprecated)
 
 Usage
 ---------------------------------------------------------------------------
