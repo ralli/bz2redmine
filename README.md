@@ -44,4 +44,9 @@ Aditional Steps
 
     update users set admin = true where id in (1, 13);
  
+ 
+ Special Usage
+ ---------------------------------------------------------------------------
+ 
+ * The tables to be migrated can be customized changing "def migrate". Commenting blocks of calls excepts parts of the migration
 
