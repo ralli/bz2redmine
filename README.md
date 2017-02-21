@@ -23,7 +23,7 @@ Features
 * Preserves the Bugzilla bug numbers
 * Converts most of the existing Bugzilla data including attachments
 * Has been successfully used to convert a Bugzilla 4.2.1 to Redmine 3.3
-* This fork uses the new __mysql2__ Driver to provide performance. (__mysql__ is deprecated)
+* This fork uses the new __mysql2__ Driver to provide performance. (__mysql__ is deprecated and no longer maintained )
 
 Usage
 ---------------------------------------------------------------------------
@@ -36,11 +36,13 @@ Usage
   to match your needs.
 * run the script
 
-According to Alexander Zhovnuvaty the following additional steps are
-needed to finish the migration:
 
 Aditional Steps
 ---------------------------------------------------------------------------
+
+_According to Alexander Zhovnuvaty the following additional steps are
+needed to finish the migration_
+
 * Grant administrator permissions to certain users. In this particular case for users with 1, 13 ids;
 
     update users set admin = true where id in (1, 13);
@@ -49,5 +51,9 @@ Aditional Steps
  Special Usage
  ---------------------------------------------------------------------------
  
- * The tables to be migrated can be customized changing "def migrate". Commenting blocks of calls excepts parts of the migration
+ * The tables to be migrated can be customized changing "def migrate". Commenting 
+   blocks of calls excepts parts of the migration.
+   
+   
+   
 
